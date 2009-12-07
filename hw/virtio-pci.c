@@ -21,6 +21,7 @@
 #include "msix.h"
 #include "net.h"
 #include "loader.h"
+#include "device-tap.h"
 
 /* from Linux's linux/virtio_pci.h */
 
@@ -345,6 +346,76 @@ static void virtio_pci_config_writel(void *opaque, uint32_t addr, uint32_t val)
     virtio_config_writel(proxy->vdev, addr, val);
 }
 
+static void virtio_pci_config_tap_writeb(void *opaque, uint32_t addr,
+                                         uint32_t val)
+{
+    VirtIOPCIProxy *proxy = opaque;
+    uint32_t tap_addr = addr - proxy->addr;
+
+    if (tap_addr == VIRTIO_PCI_QUEUE_NOTIFY)
+        dtap_func((void *)proxy->pci_dev.qdev.info);
+
+    virtio_pci_config_writeb(opaque, addr, val);
+}
+
+static void virtio_pci_config_tap_writew(void *opaque, uint32_t addr,
+                                         uint32_t val)
+{
+    VirtIOPCIProxy *proxy = opaque;
+    uint32_t tap_addr = addr - proxy->addr;
+
+    if (tap_addr == VIRTIO_PCI_QUEUE_NOTIFY)
+        dtap_func((void *)proxy->pci_dev.qdev.info);
+
+    virtio_pci_config_writew(opaque, addr, val);
+}
+
+static void virtio_pci_config_tap_writel(void *opaque, uint32_t addr,
+                                         uint32_t val)
+{
+    VirtIOPCIProxy *proxy = opaque;
+    uint32_t tap_addr = addr - proxy->addr;
+
+    if (tap_addr == VIRTIO_PCI_QUEUE_NOTIFY)
+        dtap_func((void *)proxy->pci_dev.qdev.info);
+
+    virtio_pci_config_writel(opaque, addr, val);
+}
+
+static int virtio_register_tap(DTap *dtap, void *opaque)
+{
+    VirtIOPCIProxy *proxy = opaque;
+    VirtIODevice *vdev = proxy->vdev;
+    PCIDevice *pci_dev = &proxy->pci_dev;    
+    unsigned config_len = VIRTIO_PCI_REGION_SIZE(pci_dev) + vdev->config_len;
+
+    register_ioport_write(proxy->addr, config_len, 1, 
+                          virtio_pci_config_tap_writeb, proxy);
+    register_ioport_write(proxy->addr, config_len, 2,
+                          virtio_pci_config_tap_writew, proxy);
+    register_ioport_write(proxy->addr, config_len, 4,
+                          virtio_pci_config_tap_writel, proxy);
+
+    return 0;
+}
+
+static int virtio_unregister_tap(DTap *dtap, void *opaque)
+{
+    VirtIOPCIProxy *proxy = opaque;
+    VirtIODevice *vdev = proxy->vdev;
+    PCIDevice *pci_dev = &proxy->pci_dev;    
+    unsigned config_len = VIRTIO_PCI_REGION_SIZE(pci_dev) + vdev->config_len;
+
+    register_ioport_write(proxy->addr, config_len, 1, 
+                          virtio_pci_config_writeb, proxy);
+    register_ioport_write(proxy->addr, config_len, 2,
+                          virtio_pci_config_writew, proxy);
+    register_ioport_write(proxy->addr, config_len, 4,
+                          virtio_pci_config_writel, proxy);
+
+    return 0;
+}
+
 static void virtio_map(PCIDevice *pci_dev, int region_num,
                        pcibus_t addr, pcibus_t size, int type)
 {
@@ -441,6 +512,9 @@ static void virtio_init_pci(VirtIOPCIProxy *proxy, VirtIODevice *vdev,
     pci_register_bar(&proxy->pci_dev, 0, size, PCI_BASE_ADDRESS_SPACE_IO,
                            virtio_map);
 
+    tap_dev_init(proxy->pci_dev.qdev.info->name, proxy,
+                 virtio_register_tap, virtio_unregister_tap);
+
     virtio_bind_device(vdev, &virtio_pci_bindings, proxy);
 }
 
@@ -470,6 +544,9 @@ static int virtio_blk_init_pci(PCIDevice *pci_dev)
 
 static int virtio_exit_pci(PCIDevice *pci_dev)
 {
+    VirtIOPCIProxy *proxy = DO_UPCAST(VirtIOPCIProxy, pci_dev, pci_dev);
+
+    tap_dev_exit(proxy);    
     return msix_uninit(pci_dev);
 }
 
