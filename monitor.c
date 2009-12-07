@@ -30,6 +30,7 @@
 #include "hw/pci.h"
 #include "hw/watchdog.h"
 #include "hw/loader.h"
+#include "hw/device-tap.h"
 #include "gdbstub.h"
 #include "net.h"
 #include "net/slirp.h"

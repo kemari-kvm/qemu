@@ -1076,6 +1076,19 @@ STEXI
 Set CPU @var{cpu} online or offline.
 ETEXI
 
+    {
+        .name       = "device_tap",
+        .args_type  = "state:s",
+        .params     = "[on|off]",
+        .help       = "register/unregister device-tap",
+        .mhandler.cmd  = do_device_tap,
+    },
+
+STEXI
+@item device_tap [online|offline]
+Set device_tap on or off.
+ETEXI
+
 STEXI
 @end table
 ETEXI
