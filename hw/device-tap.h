@@ -30,7 +30,7 @@ struct device_tap {
     int tap_ioport_write[MAX_IOPORTS][3];
 /*     int tap_iomem_read[IO_MEM_NB_ENTRIES][4]; */
 /*     int tap_iomem_write[IO_MEM_NB_ENTRIES][4]; */
-    void (*tap_func)(void *opaque);
+    int (*tap_func)(void *opaque);
 
     QLIST_HEAD(dtap_head, device_tap_entry) dtap_head;
 };
@@ -42,7 +42,7 @@ int tap_dev_init(const char *name, void *opaque,
                  int (*register_tap)(DTap *dtap, void *opaque),
                  int (*unregister_tap)(DTap *dtap, void *opaque));
 int tap_dev_exit(void *opaque);
-int register_tap_all(void (*func)(void *opaque));
+int register_tap_all(int (*func)(void *opaque));
 int unregister_tap_all(void);
 
 /* Temporary place here for debug */

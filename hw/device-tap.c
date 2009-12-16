@@ -107,7 +107,7 @@ int tap_dev_exit(void *opaque)
     return !QLIST_EMPTY(&dtap.dtap_head);
 }
 
-int register_tap_all(void (*func)(void *opaque))
+int register_tap_all(int (*func)(void *opaque))
 {
     struct device_tap_entry *dtap_entry;
     DeviceInfo *info;
@@ -163,10 +163,11 @@ int unregister_tap_all(void)
     return 0;
 }
 
-static void print_opaque(void *opaque)
+static int print_opaque(void *opaque)
 {
     DeviceInfo *qdev = opaque;
     dprintf("name %s\n", qdev->name);
+    return 0;
 }
 
 void do_device_tap(Monitor *mon, const QDict *qdict)

@@ -56,7 +56,7 @@ void kemari_new_timer(void);
 
 void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data);
 
-int kemari_iterate(void);
+int kemari_iterate(void *opaque);
 
 void kemari_fd_put_ready(void* opaque);
 

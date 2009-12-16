@@ -32,10 +32,10 @@
 FdMigrationState *kemari = NULL;
 static int socket_writev(FdMigrationState *s, const void * buf, size_t size);
   
-int kemari_iterate(void){
-    static int count = 0;
+int kemari_iterate(void *opaque){
+    /* static int count = 0; */
     FdMigrationState *s = kemari;
-    printf("count = %d\n", ++count);
+    /* printf("count = %d\n", ++count); */
     
     if(kemari_allowed==KEMARI_START){
         kemari_allowed = KEMARI_ITERATE;
@@ -50,10 +50,10 @@ int kemari_iterate(void){
 void kemari_iterate_incoming(void* opaque)
 {
     QEMUFile *f = opaque;
-    static int count = 0;
+/*     static int count = 0; */
     
     /* kemari_allowed = KEMARI_ITERATE; */
-    printf("count = %d\n", ++count);
+    /* printf("count = %d\n", ++count); */
     int ret;
     
     ret = kemari_loadvm_state(f);
@@ -89,7 +89,7 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
             }
         offset += len;
         if (offset >= sum) {
-            printf("offset = %zd\n", offset);
+/*             printf("offset = %zd\n", offset); */
             return offset;
         }
         
@@ -111,8 +111,8 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
 
 static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
 {
-    static int cnt = 0;
-    printf("cnt=%d, header=%d\n", ++cnt, s->state);
+    /* static int cnt = 0; */
+    /* printf("cnt=%d, header=%d\n", ++cnt, s->state); */
     struct iovec iov[2];
     /* int header; */
 
@@ -121,7 +121,7 @@ static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
         int tmp_header = -10;
         payload[0] = size/256;
         payload[1] = size%256;
-        printf("cnt=%d, header=%d, buf[0]=%u, buf[1]=%u, size=%zd\n", ++cnt, tmp_header, payload[0], payload[1], size);
+/*         printf("cnt=%d, header=%d, buf[0]=%u, buf[1]=%u, size=%zd\n", ++cnt, tmp_header, payload[0], payload[1], size); */
         iov[0].iov_base = &tmp_header;
         iov[0].iov_len = sizeof(tmp_header);
         iov[1].iov_base = (void *)payload;
