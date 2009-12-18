@@ -17,6 +17,7 @@
 #include "sysemu.h"
 #include "qemu-char.h"
 #include "buffered_file.h"
+#include "migration.h"
 
 //#define DEBUG_BUFFERED_FILE
 
@@ -126,7 +127,7 @@ static int buffered_put_buffer(void *opaque, const uint8_t *buf, int64_t pos, in
     buffered_flush(s);
 
     while (!s->freeze_output && offset < size) {
-        if (s->bytes_xfer > s->xfer_limit) {
+      if (s->bytes_xfer > s->xfer_limit && !kemari_enabled()) {
             dprintf("transfer limit exceeded when putting\n");
             break;
         }
@@ -171,7 +172,7 @@ static int buffered_close(void *opaque)
         if (s->freeze_output)
             s->wait_for_unfreeze(s);
     }
-
+    
     ret = s->close(s->opaque);
 
     qemu_del_timer(s->timer);
@@ -221,6 +222,7 @@ static size_t buffered_get_rate_limit(void *opaque)
 static void buffered_rate_tick(void *opaque)
 {
     QEMUFileBuffered *s = opaque;
+    printf("buffered_rate_tic\n");
 
     if (s->has_error)
         return;
@@ -261,9 +263,10 @@ QEMUFile *qemu_fopen_ops_buffered(void *opaque,
                              buffered_set_rate_limit,
 			     buffered_get_rate_limit);
 
-    s->timer = qemu_new_timer(rt_clock, buffered_rate_tick, s);
-
-    qemu_mod_timer(s->timer, qemu_get_clock(rt_clock) + 100);
+    if (!kemari_enabled()) {
+        s->timer = qemu_new_timer(rt_clock, buffered_rate_tick, s);
+        qemu_mod_timer(s->timer, qemu_get_clock(rt_clock) + 100);
+    }
 
     return s->file;
 }

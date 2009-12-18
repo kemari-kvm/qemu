@@ -31,10 +31,19 @@
     do { } while (0)
 #endif
 
+int kemari_allowed = 0;
+
 /* Migration speed throttling */
 static uint32_t max_throttle = (32 << 20);
 
 static MigrationState *current_migration;
+
+void qemu_start_incoming_kemari(const char *uri)
+{
+
+  kemari_allowed = KEMARI_START;
+  qemu_start_incoming_migration(uri);
+}
 
 void qemu_start_incoming_migration(const char *uri)
 {
@@ -53,6 +62,15 @@ void qemu_start_incoming_migration(const char *uri)
     else
         fprintf(stderr, "unknown migration protocol: %s\n", uri);
 }
+
+
+void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data)
+{
+    kemari_allowed = KEMARI_START;
+    do_migrate(mon, qdict, ret_data);
+    kemari_new_timer();
+}
+
 
 void do_migrate(Monitor *mon, const QDict *qdict, QObject **ret_data)
 {
@@ -337,7 +355,7 @@ ssize_t migrate_fd_put_buffer(void *opaque, const void *data, size_t size)
 {
     FdMigrationState *s = opaque;
     ssize_t ret;
-
+    
     do {
         ret = s->write(s, data, size);
     } while (ret == -1 && ((s->get_error(s)) == EINTR));
@@ -370,8 +388,46 @@ void migrate_fd_connect(FdMigrationState *s)
         migrate_fd_error(s);
         return;
     }
+    if (kemari_enabled())
+        kemari_fd_put_ready(s);
+    else
+        migrate_fd_put_ready(s);
+
+}
+
+void kemari_fd_put_ready(void *opaque)
+{
+    FdMigrationState *s = opaque;
+    int size;
+    int ack = 0;
+    int ret;
+    int old_vm_running = vm_running;
     
-    migrate_fd_put_ready(s);
+    if (kemari_allowed != KEMARI_START) /* if (kemari_allowed == KEMARI_ITERATE) */
+        ret = qemu_savevm_state_begin(s->mon, s->file, s->mig_state.blk, s->mig_state.shared);
+    
+    vm_stop(0);
+    qemu_aio_flush();
+    bdrv_flush_all();
+    if ((qemu_savevm_state_complete(s->mon, s->file)) < 0) {
+        if (old_vm_running) {
+            vm_start();
+        }
+        s->state = MIG_STATE_ERROR;
+    } else {
+        s->state = KEMARI_VM_SECTION_END;
+
+        qemu_fflush(s->file);
+        if (kemari_allowed == KEMARI_ITERATE){
+            do {
+                size = read(s->fd, &ack, sizeof(int));
+            } while (ack!=KEMARI_END);
+            printf("ack=%d\n", ack);
+        }
+        vm_start();
+    }
+    
+    /* s->state = state; */
 }
 
 void migrate_fd_put_ready(void *opaque)
@@ -382,10 +438,9 @@ void migrate_fd_put_ready(void *opaque)
         dprintf("put_ready returning because of non-active state\n");
         return;
     }
-
     dprintf("iterate\n");
     if (qemu_savevm_state_iterate(s->mon, s->file) == 1) {
-        int state;
+	int state;
         int old_vm_running = vm_running;
 
         dprintf("done iterating\n");
