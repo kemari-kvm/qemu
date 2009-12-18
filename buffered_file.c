@@ -222,8 +222,7 @@ static size_t buffered_get_rate_limit(void *opaque)
 static void buffered_rate_tick(void *opaque)
 {
     QEMUFileBuffered *s = opaque;
-    printf("buffered_rate_tic\n");
-
+    
     if (s->has_error)
         return;
 

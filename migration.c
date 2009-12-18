@@ -422,7 +422,7 @@ void kemari_fd_put_ready(void *opaque)
             do {
                 size = read(s->fd, &ack, sizeof(int));
             } while (ack!=KEMARI_END);
-            printf("ack=%d\n", ack);
+            /* printf("ack=%d\n", ack); */
         }
         vm_start();
     }

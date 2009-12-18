@@ -81,7 +81,7 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
     errno=0;
     for (offset = 0;;) {
         len = writev(fd, iov, count);
-        if ( len == -1 )
+        if ( len <= 0 )
             {
                          /* ERROR("writev failed errno %d", errno); */
                 printf("writev failed errno %d\n", errno);
@@ -89,15 +89,13 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
             }
         offset += len;
         if (offset >= sum) {
-            printf("offset = %zd\n", offset);
+            /* printf("offset = %zd\n", offset); */
             return offset;
         }
         
         for (i = 0; i < count; i++) {
             len -= iov[i].iov_len;
             if ( len <= 0 ) {
-                /* iov[i].iov_len += len; */
-                /* iov[i].iov_base -= len; */
                 iov[i].iov_base += iov[i].iov_len + len;
                 iov[i].iov_len = -len;
                 iov = &iov[i];
@@ -111,8 +109,8 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
 
 static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
 {
-    static int cnt = 0;
-    printf("cnt=%d, header=%d\n", ++cnt, s->state);
+    /* static int cnt = 0; */
+    /* printf("cnt=%d, header=%d\n", ++cnt, s->state); */
     struct iovec iov[2];
     /* int header; */
 
@@ -121,7 +119,7 @@ static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
         int tmp_header = -10;
         payload[0] = size/256;
         payload[1] = size%256;
-        printf("cnt=%d, header=%d, buf[0]=%u, buf[1]=%u, size=%zd\n", ++cnt, tmp_header, payload[0], payload[1], size);
+        /* printf("cnt=%d, header=%d, buf[0]=%u, buf[1]=%u, size=%zd\n", ++cnt, tmp_header, payload[0], payload[1], size); */
         iov[0].iov_base = &tmp_header;
         iov[0].iov_len = sizeof(tmp_header);
         iov[1].iov_base = (void *)payload;

@@ -263,7 +263,7 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
     struct iovec iov[2];
     int header = KEMARI_VM_SECTION_PART;
     int len  = 0;
-    static int cnt = 0;
+    /* static int cnt = 0; */
     
     do {
         if ((f->offset - f->buf_size) < IO_BUF_SIZE){
@@ -285,7 +285,7 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
         
         if ( len < 0 ) break;
         
-        printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size);
+        /* printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size); */
 
         if (header == -10) {
             /* not thinking about alignment !! */
@@ -293,14 +293,14 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
             size += (int)buf[1];
             /* not thinking about alignment !! */
             
-            printf("buf[0]=%u, buf[1]=%u, size=%d\n", buf[0], buf[1], size);
+            /* printf("buf[0]=%u, buf[1]=%u, size=%d\n", buf[0], buf[1], size); */
         } else {
             f->buf_size += len;
             size = IO_BUF_SIZE;
         }
     } while (header == KEMARI_VM_SECTION_PART || header == -10);
     
-    printf("header=%d\n", header);
+    /* printf("header=%d\n", header); */
     
     if (header == KEMARI_VM_SECTION_END)
         return KEMARI_VM_SECTION_END;
@@ -1588,7 +1588,7 @@ int qemu_loadvm_state(QEMUFile *f)
     if (kemari_allowed==KEMARI_ITERATE) {
 	ack = KEMARI_END;
 	size = write(s->fd, &ack, sizeof(int));
-	printf("size=%d, ack=%d\n", size, ack);
+	/* printf("size=%d, ack=%d\n", size, ack); */
     }
 
 
@@ -1685,15 +1685,6 @@ int qemu_loadvm_state(QEMUFile *f)
         }
 	
     }
-
-    /*
-    if (kemari_allowed==KEMARI_ITERATE) {
-	ack = KEMARI_END;
-	size = write(s->fd, &ack, sizeof(int));
-	printf("size=%d, ack=%d\n", size, ack);
-    }
-    */
-
     ret = 0;
 
 out:

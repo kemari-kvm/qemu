@@ -3088,7 +3088,7 @@ static int ram_save_live(Monitor *mon, QEMUFile *f, int stage, void *opaque)
         return 0;
     }
 
-    if (stage == 1 && kemari_allowed==KEMARI_START) {
+    if ((stage == 1 && !kemari_enabled()) || (stage == 1 && kemari_allowed==KEMARI_START)) {
 
         /* Make sure all dirty bits are set */
         for (addr = 0; addr < last_ram_offset; addr += TARGET_PAGE_SIZE) {
