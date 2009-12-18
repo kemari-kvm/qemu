@@ -29,6 +29,116 @@
     do { } while (0)
 #endif
 
+FdMigrationState *kemari = NULL;
+static int socket_writev(FdMigrationState *s, const void * buf, size_t size);
+  
+int kemari_iterate(void){
+    static int count = 0;
+    FdMigrationState *s = kemari;
+    printf("count = %d\n", ++count);
+    
+    if(kemari_allowed==KEMARI_START){
+        kemari_allowed = KEMARI_ITERATE;
+        s->write = socket_writev;
+    }
+    s->state = KEMARI_VM_SECTION_PART;
+    kemari_fd_put_ready(s);
+
+    return s->state;
+}
+
+void kemari_iterate_incoming(void* opaque)
+{
+    QEMUFile *f = opaque;
+    static int count = 0;
+    
+    /* kemari_allowed = KEMARI_ITERATE; */
+    printf("count = %d\n", ++count);
+    int ret;
+    
+    ret = kemari_loadvm_state(f);
+    
+    if (ret==KEMARI_VM_SECTION_ERROR){
+        qemu_announce_self();
+        dprintf("successfully loaded vm state\n");
+        if (autostart)
+            vm_start();
+        /* close(f->sd); */
+        qemu_fclose(f);
+    }
+    
+}
+
+static inline int writev_exact(int fd, struct iovec *iov, size_t count)
+{
+    int i;
+    size_t sum, offset;
+    ssize_t len;
+    
+    for (i = 0, sum = 0; i < count; i++)
+        sum += iov[i].iov_len;
+ 
+    errno=0;
+    for (offset = 0;;) {
+        len = writev(fd, iov, count);
+        if ( len == -1 )
+            {
+                         /* ERROR("writev failed errno %d", errno); */
+                printf("writev failed errno %d\n", errno);
+                return -1;
+            }
+        offset += len;
+        if (offset >= sum) {
+            printf("offset = %zd\n", offset);
+            return offset;
+        }
+        
+        for (i = 0; i < count; i++) {
+            len -= iov[i].iov_len;
+            if ( len <= 0 ) {
+                /* iov[i].iov_len += len; */
+                /* iov[i].iov_base -= len; */
+                iov[i].iov_base += iov[i].iov_len + len;
+                iov[i].iov_len = -len;
+                iov = &iov[i];
+                count -= i;
+                break;
+            }
+        }
+    }
+    /* return 0 */
+}
+
+static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
+{
+    static int cnt = 0;
+    printf("cnt=%d, header=%d\n", ++cnt, s->state);
+    struct iovec iov[2];
+    /* int header; */
+
+    if (size < 32768) {
+        uint8_t payload[32768];
+        int tmp_header = -10;
+        payload[0] = size/256;
+        payload[1] = size%256;
+        printf("cnt=%d, header=%d, buf[0]=%u, buf[1]=%u, size=%zd\n", ++cnt, tmp_header, payload[0], payload[1], size);
+        iov[0].iov_base = &tmp_header;
+        iov[0].iov_len = sizeof(tmp_header);
+        iov[1].iov_base = (void *)payload;
+        iov[1].iov_len = 32768;
+        writev_exact(s->fd, iov, 2);
+    }        
+    
+    iov[0].iov_base = &s->state;
+    iov[0].iov_len = sizeof(s->state);
+    iov[1].iov_base = (void *)buf;
+    iov[1].iov_len = size;
+    
+    return (writev_exact(s->fd, iov, 2) - sizeof(s->state));
+}
+  
+
+
 static int socket_errno(FdMigrationState *s)
 {
     return socket_error();
@@ -111,7 +221,8 @@ MigrationState *tcp_start_outgoing_migration(Monitor *mon,
         return NULL;
     }
 
-    socket_set_nonblock(s->fd);
+    if (!kemari_enabled())
+        socket_set_nonblock(s->fd);
 
     if (!detach) {
         migrate_fd_monitor_suspend(s, mon);
@@ -133,6 +244,9 @@ MigrationState *tcp_start_outgoing_migration(Monitor *mon,
         return NULL;
     } else if (ret >= 0)
         migrate_fd_connect(s);
+
+    if (kemari_enabled())
+        kemari = s;
 
     return &s->mig_state;
 }
@@ -167,19 +281,23 @@ static void tcp_accept_incoming_migration(void *opaque)
         fprintf(stderr, "load of migration failed\n");
         goto out_fopen;
     }
-    qemu_announce_self();
-    dprintf("successfully loaded vm state\n");
 
     /* we've successfully migrated, close the server socket */
     qemu_set_fd_handler2(s, NULL, NULL, NULL, NULL);
-    close(s);
-    if (autostart)
-        vm_start();
-
-out_fopen:
-    qemu_fclose(f);
-out:
-    close(c);
+    if (!kemari_enabled()) {
+        qemu_announce_self();
+        dprintf("successfully loaded vm state\n");
+        close(s);
+        if (autostart)
+            vm_start();
+      out_fopen:
+        qemu_fclose(f);
+      out:
+        close(c);
+    } else {
+        qemu_set_fd_handler2(c, NULL, kemari_iterate_incoming, NULL, f);
+        close(s);
+    }
 }
 
 int tcp_start_incoming_migration(const char *host_port)

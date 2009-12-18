@@ -69,6 +69,9 @@ int qemu_savevm_state_iterate(Monitor *mon, QEMUFile *f);
 int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f);
 void qemu_savevm_state_cancel(Monitor *mon, QEMUFile *f);
 int qemu_loadvm_state(QEMUFile *f);
+int kemari_loadvm_state(QEMUFile *f);
+
+
 
 void qemu_errors_to_file(FILE *fp);
 void qemu_errors_to_mon(Monitor *mon);

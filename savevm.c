@@ -170,12 +170,14 @@ struct QEMUFile {
     void *opaque;
     int is_write;
 
-    int64_t buf_offset; /* start of buffer when writing, end of buffer
+    uint64_t buf_offset; /* start of buffer when writing, end of buffer
                            when reading */
-    int buf_index;
-    int buf_size; /* 0 when writing */
-    uint8_t buf[IO_BUF_SIZE];
-
+    uint64_t buf_index;
+    uint64_t buf_size; /* 0 when writing */
+    uint8_t *buf;
+    uint8_t *transaction_buf;
+    uint64_t offset;
+    
     int has_error;
 };
 
@@ -209,8 +211,101 @@ static int socket_get_buffer(void *opaque, uint8_t *buf, int64_t pos, int size)
 static int socket_close(void *opaque)
 {
     QEMUFileSocket *s = opaque;
+    if (kemari_enabled()) qemu_set_fd_handler2(s->fd, NULL, NULL, NULL, NULL);
     qemu_free(s);
     return 0;
+}
+
+static inline int readv_exact(int fd, struct iovec *iov, size_t count)
+{
+    int i;
+    size_t sum, offset;
+    ssize_t len;
+    
+    for (i = 0, sum = 0; i < count; i++)
+        sum += iov[i].iov_len;
+    
+    errno=0;
+    for (offset = 0;;) {
+        len = readv(fd, iov, count);
+        if ( len <= 0 && socket_error() != EINTR)
+            {
+                /* ERROR("readv failed errno %d", errno); */
+                printf("readv failed errno %d", errno);
+                return -1;
+            }
+        
+        if (len > 0)
+            offset += len;
+        
+        if (offset == sum)
+            return offset;
+        
+        for (i = 0; i < count; i++) {
+            len -= iov[i].iov_len;
+            if ( len <= 0 ) {
+                iov[i].iov_base += iov[i].iov_len + len;
+                iov[i].iov_len = -len;
+                iov = &iov[i];
+                count -= i;
+                break;
+            }
+        }
+    }
+    /* return 0; */
+}
+
+static int socket_get_transaction(void *opaque, uint8_t *buf,
+                                  int64_t pos, int size)
+{
+    QEMUFileSocket *s = opaque;
+    QEMUFile *f = s->file;
+    struct iovec iov[2];
+    int header = KEMARI_VM_SECTION_PART;
+    int len  = 0;
+    static int cnt = 0;
+    
+    do {
+        if ((f->offset - f->buf_size) < IO_BUF_SIZE){
+            f->offset *= 2;
+            f->buf = (uint8_t*)qemu_realloc(f->buf, f->offset);
+        }
+        
+        if (size == IO_BUF_SIZE) {
+            buf = f->buf + f->buf_size;
+        } 
+
+        iov[0].iov_base = &header;
+        iov[0].iov_len = sizeof(header);
+        iov[1].iov_base = buf;
+        iov[1].iov_len = size;
+        /* iov[1].iov_len = size; */
+        
+        len = (readv_exact(s->fd, iov, 2) - sizeof(header));
+        
+        if ( len < 0 ) break;
+        
+        printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size);
+
+        if (header == -10) {
+            /* not thinking about alignment !! */
+            size = (int)buf[0] * 256;
+            size += (int)buf[1];
+            /* not thinking about alignment !! */
+            
+            printf("buf[0]=%u, buf[1]=%u, size=%d\n", buf[0], buf[1], size);
+        } else {
+            f->buf_size += len;
+            size = IO_BUF_SIZE;
+        }
+    } while (header == KEMARI_VM_SECTION_PART || header == -10);
+    
+    printf("header=%d\n", header);
+    
+    if (header == KEMARI_VM_SECTION_END)
+        return KEMARI_VM_SECTION_END;
+    else
+        return -1;
 }
 
 static int stdio_put_buffer(void *opaque, const uint8_t *buf, int64_t pos, int size)
@@ -415,7 +510,8 @@ QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
     QEMUFile *f;
 
     f = qemu_mallocz(sizeof(QEMUFile));
-
+    f->buf = (uint8_t*)qemu_mallocz(sizeof(uint8_t)*IO_BUF_SIZE);
+    f->offset = IO_BUF_SIZE;
     f->opaque = opaque;
     f->put_buffer = put_buffer;
     f->get_buffer = get_buffer;
@@ -442,7 +538,7 @@ void qemu_fflush(QEMUFile *f)
 {
     if (!f->put_buffer)
         return;
-
+    
     if (f->is_write && f->buf_index > 0) {
         int len;
 
@@ -458,7 +554,6 @@ void qemu_fflush(QEMUFile *f)
 static void qemu_fill_buffer(QEMUFile *f)
 {
     int len;
-
     if (!f->get_buffer)
         return;
 
@@ -979,7 +1074,6 @@ const VMStateInfo vmstate_info_buffer = {
 
 /* unused buffers: space that was used for some fields that are
    not usefull anymore */
-
 static int get_unused_buffer(QEMUFile *f, void *pv, size_t size)
 {
     uint8_t buf[1024];
@@ -1057,7 +1151,7 @@ int register_savevm_live(const char *idstr,
                          LoadStateHandler *load_state,
                          void *opaque)
 {
-    SaveStateEntry *se;
+  SaveStateEntry *se;
 
     se = qemu_mallocz(sizeof(SaveStateEntry));
     pstrcpy(se->idstr, sizeof(se->idstr), idstr);
@@ -1402,7 +1496,13 @@ int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f)
     }
 
     qemu_put_byte(f, QEMU_VM_EOF);
+    
+    if (kemari_allowed == KEMARI_ITERATE) {
+        memset(f->buf + f->buf_index, 0, IO_BUF_SIZE - f->buf_index);
+        f->buf_index = IO_BUF_SIZE;
+    }
 
+    
     if (qemu_file_has_error(f))
         return -EIO;
 
@@ -1479,6 +1579,18 @@ int qemu_loadvm_state(QEMUFile *f)
     uint8_t section_type;
     unsigned int v;
     int ret;
+    QEMUFileSocket *s = f->opaque;
+    int size;
+    int ack = 0;
+    printf("qemu_loadvm_state\n");
+    
+
+    if (kemari_allowed==KEMARI_ITERATE) {
+	ack = KEMARI_END;
+	size = write(s->fd, &ack, sizeof(int));
+	printf("size=%d, ack=%d\n", size, ack);
+    }
+
 
     v = qemu_get_be32(f);
     if (v != QEMU_VM_FILE_MAGIC)
@@ -1497,7 +1609,7 @@ int qemu_loadvm_state(QEMUFile *f)
         SaveStateEntry *se;
         char idstr[257];
         int len;
-
+	
         switch (section_type) {
         case QEMU_VM_SECTION_START:
         case QEMU_VM_SECTION_FULL:
@@ -1509,6 +1621,10 @@ int qemu_loadvm_state(QEMUFile *f)
             instance_id = qemu_get_be32(f);
             version_id = qemu_get_be32(f);
 
+	    /*
+	      if(section_type==QEMU_VM_SECTION_FULL)
+	      printf("FULL:%s\n",idstr); 
+	    */
             /* Find savevm section */
             se = find_se(idstr, instance_id);
             if (se == NULL) {
@@ -1567,7 +1683,16 @@ int qemu_loadvm_state(QEMUFile *f)
             ret = -EINVAL;
             goto out;
         }
+	
     }
+
+    /*
+    if (kemari_allowed==KEMARI_ITERATE) {
+	ack = KEMARI_END;
+	size = write(s->fd, &ack, sizeof(int));
+	printf("size=%d, ack=%d\n", size, ack);
+    }
+    */
 
     ret = 0;
 
@@ -1577,10 +1702,45 @@ out:
         qemu_free(le);
     }
 
-    if (qemu_file_has_error(f))
+    if (qemu_file_has_error(f)){
+      printf("qemu_file_has_error()\n");
         ret = -EIO;
+    }
 
     return ret;
+}
+
+int kemari_loadvm_state(QEMUFile *f)
+{
+    printf("kemari_loadvm_state\n");
+    int ret;
+    QEMUFileSocket *s = f->opaque;
+
+    if (kemari_allowed == KEMARI_START) {
+        struct timeval tv = {
+            .tv_sec  = 5,
+            .tv_usec = 0
+        };
+        if (setsockopt(s->fd, SOL_SOCKET, SO_RCVTIMEO, 
+                       &tv, sizeof(tv)) < 0) {
+            /* ERROR("failed to set SO_RCVTIMEO"); */ 
+        }
+        if (setsockopt(s->fd, SOL_SOCKET, SO_SNDTIMEO, 
+                       &tv, sizeof(tv)) < 0) {
+            /* ERROR("failed to set SO_SNDTIMEO"); */         
+        }
+        f->get_buffer = NULL;
+        kemari_allowed = KEMARI_ITERATE; 
+    }
+
+
+    f->buf_size = f->buf_index = f->buf_offset = 0;
+    
+    ret = socket_get_transaction(s, f->buf, 0, IO_BUF_SIZE);
+    if (ret != KEMARI_VM_SECTION_END)
+	return KEMARI_VM_SECTION_ERROR;
+    
+    return qemu_loadvm_state(f);
 }
 
 /* device can contain snapshots */

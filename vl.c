@@ -3088,8 +3088,7 @@ static int ram_save_live(Monitor *mon, QEMUFile *f, int stage, void *opaque)
         return 0;
     }
 
-    if (stage == 1) {
-        bytes_transferred = 0;
+    if (stage == 1 && kemari_allowed==KEMARI_START) {
 
         /* Make sure all dirty bits are set */
         for (addr = 0; addr < last_ram_offset; addr += TARGET_PAGE_SIZE) {
@@ -3129,7 +3128,8 @@ static int ram_save_live(Monitor *mon, QEMUFile *f, int stage, void *opaque)
         while (ram_save_block(f) != 0) {
             bytes_transferred += TARGET_PAGE_SIZE;
         }
-        cpu_physical_memory_set_dirty_tracking(0);
+        if (!kemari_enabled())
+            cpu_physical_memory_set_dirty_tracking(0);
     }
 
     qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
@@ -4910,6 +4910,23 @@ static int virtcon_parse(const char *devname)
     return 0;
 }
 
+static void kemari_timer(void * opaque)
+{
+    static int count = 0;
+    count++;
+    int ret;
+    ret = kemari_iterate();
+    if (ret==KEMARI_VM_SECTION_END)
+        qemu_mod_timer(icount_rt_timer, qemu_get_clock(rt_clock) + 1000);
+}
+  
+void kemari_new_timer(void)
+{
+    icount_rt_timer = qemu_new_timer(rt_clock, kemari_timer, NULL);
+    qemu_mod_timer(icount_rt_timer, qemu_get_clock(rt_clock) + 5000);
+}
+
+
 int main(int argc, char **argv, char **envp)
 {
     const char *gdbstub_dev = NULL;
@@ -4934,6 +4951,7 @@ int main(int argc, char **argv, char **envp)
     int tb_size;
     const char *pid_file = NULL;
     const char *incoming = NULL;
+    const char *kemari_incoming = NULL;
 #ifndef _WIN32
     int fd = 0;
     struct passwd *pwd = NULL;
@@ -5703,6 +5721,9 @@ int main(int argc, char **argv, char **envp)
                 default_net = 0;
                 default_drive = 0;
                 break;
+	    case QEMU_OPTION_kemari_incoming:
+	      kemari_incoming = optarg;
+	      break;
 #ifndef _WIN32
             case QEMU_OPTION_chroot:
                 chroot_dir = optarg;
@@ -6155,6 +6176,8 @@ int main(int argc, char **argv, char **envp)
 
     if (incoming) {
         qemu_start_incoming_migration(incoming);
+    } else if(kemari_incoming) {
+        qemu_start_incoming_kemari(kemari_incoming);
     } else if (autostart) {
         vm_start();
     }

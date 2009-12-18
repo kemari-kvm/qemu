@@ -7,7 +7,7 @@
  *  Anthony Liguori   <aliguori@us.ibm.com>
  *
  * This work is licensed under the terms of the GNU GPL, version 2.  See
- * the COPYING file in the top-level directory.
+do * the COPYING file in the top-level directory.
  *
  */
 
@@ -49,6 +49,18 @@ struct FdMigrationState
     int (*write)(struct FdMigrationState*, const void *, size_t);
     void *opaque;
 };
+
+void qemu_start_incoming_kemari(const char *uri);
+
+void kemari_new_timer(void);
+
+void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data);
+
+int kemari_iterate(void);
+
+void kemari_fd_put_ready(void* opaque);
+
+void kemari_iterate_incoming(void* opaque);
 
 void qemu_start_incoming_migration(const char *uri);
 
@@ -130,5 +142,15 @@ static inline FdMigrationState *migrate_to_fms(MigrationState *mig_state)
 {
     return container_of(mig_state, FdMigrationState, mig_state);
 }
+
+#define KEMARI_START -1 
+#define KEMARI_ITERATE -2
+#define KEMARI_END -3
+#define KEMARI_VM_SECTION_PART -4
+#define KEMARI_VM_SECTION_END -5
+#define KEMARI_VM_SECTION_ERROR -6
+
+extern int kemari_allowed;
+#define kemari_enabled() (kemari_allowed)
 
 #endif
