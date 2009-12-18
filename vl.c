@@ -4914,8 +4914,8 @@ static void kemari_timer(void * opaque)
 {
     static int count = 0;
     count++;
-    int ret;
-    ret = kemari_iterate();
+    int ret = 0; 
+    /* ret = kemari_iterate(); */
     if (ret==KEMARI_VM_SECTION_END)
         qemu_mod_timer(icount_rt_timer, qemu_get_clock(rt_clock) + 1000);
 }

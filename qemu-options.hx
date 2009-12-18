@@ -1891,13 +1891,11 @@ DEF("incoming", HAS_ARG, QEMU_OPTION_incoming, \
 STEXI
 ETEXI
 
-<<<<<<< HEAD:qemu-options.hx
 DEF("nodefaults", 0, QEMU_OPTION_nodefaults, \
     "-nodefaults     don't create default devices.\n")
-=======
+
 DEF("kemari_incoming", HAS_ARG, QEMU_OPTION_kemari_incoming, \
     "-kemari_incoming p     prepare for incoming migration, listen on port p\n")
->>>>>>> Added Kemari_Migration:qemu-options.hx
 STEXI
 ETEXI
 

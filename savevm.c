@@ -1582,7 +1582,7 @@ int qemu_loadvm_state(QEMUFile *f)
     QEMUFileSocket *s = f->opaque;
     int size;
     int ack = 0;
-    printf("qemu_loadvm_state\n");
+    /* printf("qemu_loadvm_state\n"); */
     
 
     if (kemari_allowed==KEMARI_ITERATE) {
@@ -1703,7 +1703,7 @@ out:
 
 int kemari_loadvm_state(QEMUFile *f)
 {
-    printf("kemari_loadvm_state\n");
+    /* printf("kemari_loadvm_state\n"); */
     int ret;
     QEMUFileSocket *s = f->opaque;
 

@@ -20,6 +20,7 @@
 #include "qemu_socket.h"
 #include "block-migration.h"
 #include "qemu-objects.h"
+#include "hw/device-tap.h"
 
 //#define DEBUG_MIGRATION
 
@@ -68,7 +69,8 @@ void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data)
 {
     kemari_allowed = KEMARI_START;
     do_migrate(mon, qdict, ret_data);
-    kemari_new_timer();
+    register_tap_all(kemari_iterate);
+    /* kemari_new_timer(); */
 }
 
 
