@@ -1818,7 +1818,7 @@ static void resume_all_threads(void)
 {
     CPUState *penv = first_cpu;
 
-    assert(!cpu_single_env);
+    /* assert(!cpu_single_env); */
 
     while (penv) {
         penv->stop = 0;

@@ -19,9 +19,10 @@
 #include "buffered_file.h"
 #include "block.h"
 
-//#define DEBUG_MIGRATION_TCP
+/* #define DEBUG_MIGRATION_TCP */
 
 #ifdef DEBUG_MIGRATION_TCP
+static int count = 0;
 #define dprintf(fmt, ...) \
     do { printf("migration-tcp: " fmt, ## __VA_ARGS__); } while (0)
 #else
@@ -35,7 +36,7 @@ static int socket_writev(FdMigrationState *s, const void * buf, size_t size);
 int kemari_iterate(void *opaque){
     /* static int count = 0; */
     FdMigrationState *s = kemari;
-    /* printf("count = %d\n", ++count); */
+    dprintf("count = %d\n", ++count);
     
     if(kemari_allowed==KEMARI_START){
         kemari_allowed = KEMARI_ITERATE;
@@ -53,7 +54,7 @@ void kemari_iterate_incoming(void* opaque)
 /*     static int count = 0; */
     
     /* kemari_allowed = KEMARI_ITERATE; */
-    /* printf("count = %d\n", ++count); */
+    dprintf("count = %d\n", ++count); 
     int ret;
     
     ret = kemari_loadvm_state(f);
@@ -81,7 +82,7 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
     errno=0;
     for (offset = 0;;) {
         len = writev(fd, iov, count);
-        if ( len == -1 )
+        if ( len <= -1 )
             {
                          /* ERROR("writev failed errno %d", errno); */
                 printf("writev failed errno %d\n", errno);
