@@ -85,12 +85,12 @@ static inline int writev_exact(int fd, struct iovec *iov, size_t count)
         if ( len <= 0 )
             {
                          /* ERROR("writev failed errno %d", errno); */
-                printf("writev failed errno %d\n", errno);
+                dprintf("writev failed errno %d\n", errno);
                 return -1;
             }
         offset += len;
         if (offset >= sum) {
-            /* printf("offset = %zd\n", offset); */
+            dprintf("offset = %zd\n", offset);
             return offset;
         }
         
@@ -113,7 +113,6 @@ static int socket_writev(FdMigrationState *s, const void * buf, size_t size)
     /* static int cnt = 0; */
     /* printf("cnt=%d, header=%d\n", ++cnt, s->state); */
     struct iovec iov[2];
-    /* int header; */
 
     if (size < 32768) {
         uint8_t payload[32768];
