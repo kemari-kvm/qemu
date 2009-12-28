@@ -263,7 +263,7 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
     struct iovec iov[2];
     int header = KEMARI_VM_SECTION_PART;
     int len  = 0;
-    static int cnt = 0;
+    /* static int cnt = 0; */
     
     do {
         if ((f->offset - f->buf_size) < IO_BUF_SIZE){
@@ -285,7 +285,7 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
         
         if ( len < 0 ) break;
         
-        printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size); 
+        /* printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size);  */
 
         if (header == -10) {
             /* not thinking about alignment !! */
@@ -300,7 +300,7 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
         }
     } while (header == KEMARI_VM_SECTION_PART || header == -10);
     
-    printf("header=%d\n", header); 
+    /* printf("header=%d\n", header); */ 
     
     if (header == KEMARI_VM_SECTION_END)
         return KEMARI_VM_SECTION_END;
