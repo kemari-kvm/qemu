@@ -280,17 +280,10 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
         
         len = (readv_exact(s->fd, iov, 2) - sizeof(header));
         if (len < 0) break;
-        
-        if (header == -10) {
-            /* not thinking about alignment !! */
-            size = (int)buf[0] * 256;
-            size += (int)buf[1];
-            /* not thinking about alignment !! */
-        } else {
-            f->buf_size += len;
-            size = IO_BUF_SIZE;
-        }
-    } while (header == KEMARI_VM_SECTION_PART || header == -10);
+
+        f->buf_size += len;
+        size = IO_BUF_SIZE;
+    } while (header == KEMARI_VM_SECTION_PART);
     
     if (header == KEMARI_VM_SECTION_END)
         return KEMARI_VM_SECTION_END;
