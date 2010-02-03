@@ -19,7 +19,7 @@
 #include "buffered_file.h"
 #include "migration.h"
 
-//#define DEBUG_BUFFERED_FILE
+// #define DEBUG_BUFFERED_FILE
 
 typedef struct QEMUFileBuffered
 {

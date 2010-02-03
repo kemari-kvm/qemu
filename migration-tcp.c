@@ -51,20 +51,14 @@ int kemari_iterate(void *opaque){
 void kemari_iterate_incoming(void* opaque)
 {
     QEMUFile *f = opaque;
-/*     static int count = 0; */
-    
-    /* kemari_allowed = KEMARI_ITERATE; */
-    dprintf("count = %d\n", ++count); 
     int ret;
     
     ret = kemari_loadvm_state(f);
     
-    if (ret==KEMARI_VM_SECTION_ERROR){
+    if (ret == KEMARI_VM_SECTION_ERROR) {
         qemu_announce_self();
-        dprintf("successfully loaded vm state\n");
         if (autostart)
             vm_start();
-        /* close(f->sd); */
         qemu_fclose(f);
     }
     

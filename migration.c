@@ -405,7 +405,7 @@ void kemari_fd_put_ready(void *opaque)
     int ret;
     int old_vm_running = vm_running;
     
-    if (kemari_allowed != KEMARI_START) /* if (kemari_allowed == KEMARI_ITERATE) */
+    if (kemari_allowed == KEMARI_ITERATE) 
         ret = qemu_savevm_state_begin(s->mon, s->file, s->mig_state.blk, s->mig_state.shared);
     
     vm_stop(0);
@@ -424,12 +424,9 @@ void kemari_fd_put_ready(void *opaque)
             do {
                 size = read(s->fd, &ack, sizeof(int));
             } while (ack!=KEMARI_END);
-            /* printf("ack=%d\n", ack); */
         }
         vm_start();
     }
-    
-    /* s->state = state; */
 }
 
 void migrate_fd_put_ready(void *opaque)

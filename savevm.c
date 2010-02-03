@@ -228,12 +228,11 @@ static inline int readv_exact(int fd, struct iovec *iov, size_t count)
     errno=0;
     for (offset = 0;;) {
         len = readv(fd, iov, count);
-        if ( len <= 0 && socket_error() != EINTR)
-            {
-                /* ERROR("readv failed errno %d", errno); */
-                printf("readv failed errno %d", errno);
-                return -1;
-            }
+        if (len <= 0 && socket_error() != EINTR) {
+            /* ERROR("readv failed errno %d", errno); */
+            printf("readv failed errno %d", errno);
+            return -1;
+        }
         
         if (len > 0)
             offset += len;
@@ -243,7 +242,7 @@ static inline int readv_exact(int fd, struct iovec *iov, size_t count)
         
         for (i = 0; i < count; i++) {
             len -= iov[i].iov_len;
-            if ( len <= 0 ) {
+            if (len <= 0) {
                 iov[i].iov_base += iov[i].iov_len + len;
                 iov[i].iov_len = -len;
                 iov = &iov[i];
@@ -263,10 +262,9 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
     struct iovec iov[2];
     int header = KEMARI_VM_SECTION_PART;
     int len  = 0;
-    /* static int cnt = 0; */
-    
+
     do {
-        if ((f->offset - f->buf_size) < IO_BUF_SIZE){
+        if ((f->offset - f->buf_size) < IO_BUF_SIZE) {
             f->offset *= 2;
             f->buf = (uint8_t*)qemu_realloc(f->buf, f->offset);
         }
@@ -279,28 +277,20 @@ static int socket_get_transaction(void *opaque, uint8_t *buf,
         iov[0].iov_len = sizeof(header);
         iov[1].iov_base = buf;
         iov[1].iov_len = size;
-        /* iov[1].iov_len = size; */
         
         len = (readv_exact(s->fd, iov, 2) - sizeof(header));
+        if (len < 0) break;
         
-        if ( len < 0 ) break;
-        
-        /* printf("cnt=%d, header=%d, size=%d\n",++cnt, header, size);  */
-
         if (header == -10) {
             /* not thinking about alignment !! */
             size = (int)buf[0] * 256;
             size += (int)buf[1];
             /* not thinking about alignment !! */
-            
-            /* printf("buf[0]=%u, buf[1]=%u, size=%d\n", buf[0], buf[1], size); */
         } else {
             f->buf_size += len;
             size = IO_BUF_SIZE;
         }
     } while (header == KEMARI_VM_SECTION_PART || header == -10);
-    
-    /* printf("header=%d\n", header); */ 
     
     if (header == KEMARI_VM_SECTION_END)
         return KEMARI_VM_SECTION_END;
