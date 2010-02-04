@@ -7,7 +7,7 @@
  *  Anthony Liguori   <aliguori@us.ibm.com>
  *
  * This work is licensed under the terms of the GNU GPL, version 2.  See
-do * the COPYING file in the top-level directory.
+ * the COPYING file in the top-level directory.
  *
  */
 

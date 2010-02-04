@@ -174,6 +174,7 @@ struct QEMUFile {
                            when reading */
     int buf_index;
     int buf_size; /* 0 when writing */
+
     uint8_t *buf;
     uint8_t *transaction_buf;
     uint64_t offset;
@@ -493,6 +494,7 @@ QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
     QEMUFile *f;
 
     f = qemu_mallocz(sizeof(QEMUFile));
+
     f->buf = (uint8_t*)qemu_mallocz(sizeof(uint8_t)*IO_BUF_SIZE);
     f->offset = IO_BUF_SIZE;
     f->opaque = opaque;
@@ -521,7 +523,7 @@ void qemu_fflush(QEMUFile *f)
 {
     if (!f->put_buffer)
         return;
-    
+
     if (f->is_write && f->buf_index > 0) {
         int len;
 
@@ -537,6 +539,7 @@ void qemu_fflush(QEMUFile *f)
 static void qemu_fill_buffer(QEMUFile *f)
 {
     int len;
+
     if (!f->get_buffer)
         return;
 
@@ -1057,6 +1060,7 @@ const VMStateInfo vmstate_info_buffer = {
 
 /* unused buffers: space that was used for some fields that are
    not usefull anymore */
+
 static int get_unused_buffer(QEMUFile *f, void *pv, size_t size)
 {
     uint8_t buf[1024];
@@ -1134,7 +1138,7 @@ int register_savevm_live(const char *idstr,
                          LoadStateHandler *load_state,
                          void *opaque)
 {
-  SaveStateEntry *se;
+    SaveStateEntry *se;
 
     se = qemu_mallocz(sizeof(SaveStateEntry));
     pstrcpy(se->idstr, sizeof(se->idstr), idstr);
@@ -1485,7 +1489,6 @@ int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f)
         f->buf_index = IO_BUF_SIZE;
     }
 
-    
     if (qemu_file_has_error(f))
         return -EIO;
 
@@ -1588,7 +1591,7 @@ int qemu_loadvm_state(QEMUFile *f)
         SaveStateEntry *se;
         char idstr[257];
         int len;
-	
+
         switch (section_type) {
         case QEMU_VM_SECTION_START:
         case QEMU_VM_SECTION_FULL:
@@ -1659,6 +1662,7 @@ int qemu_loadvm_state(QEMUFile *f)
             goto out;
         }
     }
+
     ret = 0;
 
 out:

@@ -64,7 +64,6 @@ void qemu_start_incoming_migration(const char *uri)
         fprintf(stderr, "unknown migration protocol: %s\n", uri);
 }
 
-
 void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data)
 {
     kemari_allowed = KEMARI_START;
@@ -72,7 +71,6 @@ void do_kemari(Monitor *mon, const QDict *qdict, QObject **ret_data)
     register_tap_all(kemari_iterate);
     /* kemari_new_timer(); */
 }
-
 
 void do_migrate(Monitor *mon, const QDict *qdict, QObject **ret_data)
 {
@@ -357,7 +355,7 @@ ssize_t migrate_fd_put_buffer(void *opaque, const void *data, size_t size)
 {
     FdMigrationState *s = opaque;
     ssize_t ret;
-    
+
     do {
         ret = s->write(s, data, size);
     } while (ret == -1 && ((s->get_error(s)) == EINTR));
@@ -437,9 +435,10 @@ void migrate_fd_put_ready(void *opaque)
         dprintf("put_ready returning because of non-active state\n");
         return;
     }
+
     dprintf("iterate\n");
     if (qemu_savevm_state_iterate(s->mon, s->file) == 1) {
-	int state;
+        int state;
         int old_vm_running = vm_running;
 
         dprintf("done iterating\n");

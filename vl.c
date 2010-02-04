@@ -3088,7 +3088,8 @@ static int ram_save_live(Monitor *mon, QEMUFile *f, int stage, void *opaque)
         return 0;
     }
 
-    if ((stage == 1 && !kemari_enabled()) || (stage == 1 && kemari_allowed==KEMARI_START)) {
+    if ((stage == 1 && !kemari_enabled()) ||
+        (stage == 1 && kemari_allowed==KEMARI_START)) {
 
         /* Make sure all dirty bits are set */
         for (addr = 0; addr < last_ram_offset; addr += TARGET_PAGE_SIZE) {
@@ -4925,7 +4926,6 @@ void kemari_new_timer(void)
     icount_rt_timer = qemu_new_timer(rt_clock, kemari_timer, NULL);
     qemu_mod_timer(icount_rt_timer, qemu_get_clock(rt_clock) + 5000);
 }
-
 
 int main(int argc, char **argv, char **envp)
 {
