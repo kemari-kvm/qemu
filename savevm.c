@@ -1565,15 +1565,11 @@ int qemu_loadvm_state(QEMUFile *f)
     QEMUFileSocket *s = f->opaque;
     int size;
     int ack = 0;
-    /* printf("qemu_loadvm_state\n"); */
-    
 
-    if (kemari_allowed==KEMARI_ITERATE) {
+    if (kemari_allowed == KEMARI_ITERATE) {
 	ack = KEMARI_END;
 	size = write(s->fd, &ack, sizeof(int));
-	/* printf("size=%d, ack=%d\n", size, ack); */
     }
-
 
     v = qemu_get_be32(f);
     if (v != QEMU_VM_FILE_MAGIC)
@@ -1604,10 +1600,6 @@ int qemu_loadvm_state(QEMUFile *f)
             instance_id = qemu_get_be32(f);
             version_id = qemu_get_be32(f);
 
-	    /*
-	      if(section_type==QEMU_VM_SECTION_FULL)
-	      printf("FULL:%s\n",idstr); 
-	    */
             /* Find savevm section */
             se = find_se(idstr, instance_id);
             if (se == NULL) {
@@ -1666,7 +1658,6 @@ int qemu_loadvm_state(QEMUFile *f)
             ret = -EINVAL;
             goto out;
         }
-	
     }
     ret = 0;
 
@@ -1686,7 +1677,6 @@ out:
 
 int kemari_loadvm_state(QEMUFile *f)
 {
-    /* printf("kemari_loadvm_state\n"); */
     int ret;
     QEMUFileSocket *s = f->opaque;
 
@@ -1706,7 +1696,6 @@ int kemari_loadvm_state(QEMUFile *f)
         f->get_buffer = NULL;
         kemari_allowed = KEMARI_ITERATE; 
     }
-
     f->buf_size = f->buf_index = f->buf_offset = 0;
     
     ret = socket_get_transaction(s, f->buf, 0, IO_BUF_SIZE);

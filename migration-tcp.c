@@ -34,11 +34,9 @@ FdMigrationState *kemari = NULL;
 static int socket_writev(FdMigrationState *s, const void * buf, size_t size);
   
 int kemari_iterate(void *opaque){
-    /* static int count = 0; */
     FdMigrationState *s = kemari;
-    dprintf("count = %d\n", ++count);
     
-    if(kemari_allowed==KEMARI_START){
+    if (kemari_allowed == KEMARI_START){
         kemari_allowed = KEMARI_ITERATE;
         s->write = socket_writev;
     }
@@ -54,14 +52,12 @@ void kemari_iterate_incoming(void* opaque)
     int ret;
     
     ret = kemari_loadvm_state(f);
-    
     if (ret == KEMARI_VM_SECTION_ERROR) {
         qemu_announce_self();
         if (autostart)
             vm_start();
         qemu_fclose(f);
     }
-    
 }
 
 static inline int writev_exact(int fd, struct iovec *iov, size_t count)

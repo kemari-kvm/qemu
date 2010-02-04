@@ -423,7 +423,7 @@ void kemari_fd_put_ready(void *opaque)
         if (kemari_allowed == KEMARI_ITERATE){
             do {
                 size = read(s->fd, &ack, sizeof(int));
-            } while (ack!=KEMARI_END);
+            } while (ack != KEMARI_END);
         }
         vm_start();
     }
