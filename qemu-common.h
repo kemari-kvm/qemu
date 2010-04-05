@@ -393,6 +393,9 @@ static inline uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     return res.ll;
 }
 
+#define ALIGN(x, y)  (((x)+(y)-1) & ~((y)-1))
+#define BITMAP_SIZE(m) (ALIGN(((m)>>TARGET_PAGE_BITS), HOST_LONG_BITS) / 8)
+
 #include "module.h"
 
 #endif

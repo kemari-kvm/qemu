@@ -37,6 +37,9 @@
 
 #include "softfloat.h"
 
+/* to use ffs in flag_to_idx() */
+#include <strings.h>
+
 #if defined(HOST_WORDS_BIGENDIAN) != defined(TARGET_WORDS_BIGENDIAN)
 #define BSWAP_NEEDED
 #endif
@@ -875,6 +878,18 @@ extern ram_addr_t ram_size;
 /* RAM is pre-allocated and passed into qemu_ram_alloc_from_ptr */
 #define RAM_PREALLOC_MASK   (1 << 0)
 
+/* Use DIRTY_IDX as indexes of bit-based phys_ram_dirty. */
+#define MASTER_DIRTY_IDX    0
+#define VGA_DIRTY_IDX       1
+#define CODE_DIRTY_IDX      2
+#define MIGRATION_DIRTY_IDX 3
+#define NUM_DIRTY_IDX       4
+
+#define MASTER_DIRTY_FLAG    (1 << MASTER_DIRTY_IDX)
+#define VGA_DIRTY_FLAG       (1 << VGA_DIRTY_IDX)
+#define CODE_DIRTY_FLAG      (1 << CODE_DIRTY_IDX)
+#define MIGRATION_DIRTY_FLAG (1 << MIGRATION_DIRTY_IDX)
+
 typedef struct RAMBlock {
     uint8_t *host;
     ram_addr_t offset;
@@ -888,7 +903,7 @@ typedef struct RAMBlock {
 } RAMBlock;
 
 typedef struct RAMList {
-    uint8_t *phys_dirty;
+    unsigned long *phys_dirty[NUM_DIRTY_IDX];
     QLIST_HEAD(ram, RAMBlock) blocks;
 } RAMList;
 extern RAMList ram_list;
@@ -914,51 +929,118 @@ extern int mem_prealloc;
 /* Set if TLB entry is an IO callback.  */
 #define TLB_MMIO        (1 << 5)
 
-#define VGA_DIRTY_FLAG       0x01
-#define CODE_DIRTY_FLAG      0x02
-#define MIGRATION_DIRTY_FLAG 0x08
+static inline int dirty_flag_to_idx(int flag)
+{
+    return ffs(flag) - 1;
+}
+
+static inline int dirty_idx_to_flag(int idx)
+{
+    return 1 << idx;
+}
 
 /* read dirty bit (return 0 or 1) */
-static inline int cpu_physical_memory_is_dirty(ram_addr_t addr)
+#define cpu_physical_memory_is_dirty(addr) \
+    cpu_physical_memory_get_dirty_idx(addr, MASTER_DIRTY_IDX)
+
+static inline void cpu_physical_memory_sync_master(unsigned long index)
 {
-    return ram_list.phys_dirty[addr >> TARGET_PAGE_BITS] == 0xff;
+    if (ram_list.phys_dirty[MASTER_DIRTY_IDX][index]) {
+        ram_list.phys_dirty[VGA_DIRTY_IDX][index]
+            |=  ram_list.phys_dirty[MASTER_DIRTY_IDX][index];
+        ram_list.phys_dirty[MIGRATION_DIRTY_IDX][index]
+            |=  ram_list.phys_dirty[MASTER_DIRTY_IDX][index];
+        ram_list.phys_dirty[MASTER_DIRTY_IDX][index] = 0UL;
+    }
 }
 
 static inline int cpu_physical_memory_get_dirty_flags(ram_addr_t addr)
 {
-    return ram_list.phys_dirty[addr >> TARGET_PAGE_BITS];
+     unsigned long mask;
+     unsigned long index = (addr >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+     int offset = (addr >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+     int ret = 0, i;
+ 
+     mask = 1UL << offset;
+     cpu_physical_memory_sync_master(index);
+
+     for (i = VGA_DIRTY_IDX; i <= MIGRATION_DIRTY_IDX; i++) {
+         if (ram_list.phys_dirty[i][index] & mask) {
+             ret |= dirty_idx_to_flag(i);
+         }
+     }
+ 
+     return ret;
+}
+
+static inline int cpu_physical_memory_get_dirty_idx(ram_addr_t addr,
+                                                    int dirty_idx)
+{
+    unsigned long mask;
+    unsigned long index = (addr >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    int offset = (addr >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+
+    mask = 1UL << offset;
+    if (dirty_idx != MASTER_DIRTY_IDX) {
+        cpu_physical_memory_sync_master(index);
+    }
+    return (ram_list.phys_dirty[dirty_idx][index] & mask) == mask;
 }
 
 static inline int cpu_physical_memory_get_dirty(ram_addr_t addr,
                                                 int dirty_flags)
 {
-    return ram_list.phys_dirty[addr >> TARGET_PAGE_BITS] & dirty_flags;
+    return cpu_physical_memory_get_dirty_idx(addr,
+                                             dirty_flag_to_idx(dirty_flags));
 }
 
 static inline void cpu_physical_memory_set_dirty(ram_addr_t addr)
 {
-    ram_list.phys_dirty[addr >> TARGET_PAGE_BITS] = 0xff;
+    unsigned long mask;
+    unsigned long index = (addr >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    int offset = (addr >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+
+    mask = 1UL << offset;
+    ram_list.phys_dirty[MASTER_DIRTY_IDX][index] |= mask;
 }
 
-static inline int cpu_physical_memory_set_dirty_flags(ram_addr_t addr,
-                                                      int dirty_flags)
+static inline void cpu_physical_memory_set_dirty_range(ram_addr_t addr,
+                                                       unsigned long mask)
 {
-    return ram_list.phys_dirty[addr >> TARGET_PAGE_BITS] |= dirty_flags;
+    unsigned long index = (addr >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+
+    ram_list.phys_dirty[MASTER_DIRTY_IDX][index] |= mask;
+}
+
+static inline void cpu_physical_memory_set_dirty_flags(ram_addr_t addr,
+                                                       int dirty_flags)
+{
+    unsigned long mask;
+    unsigned long index = (addr >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    int offset = (addr >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+
+    mask = 1UL << offset;
+    ram_list.phys_dirty[MASTER_DIRTY_IDX][index] |= mask;
+
+    if (dirty_flags & CODE_DIRTY_FLAG) {
+        ram_list.phys_dirty[CODE_DIRTY_IDX][index] |= mask;
+    }
 }
 
 static inline void cpu_physical_memory_mask_dirty_range(ram_addr_t start,
-                                                        int length,
+                                                        unsigned long length,
                                                         int dirty_flags)
 {
-    int i, mask, len;
-    uint8_t *p;
+    ram_addr_t addr = start, index;
+    unsigned long mask;
+    int offset, i;
 
-    len = length >> TARGET_PAGE_BITS;
-    mask = ~dirty_flags;
-    p = ram_list.phys_dirty + (start >> TARGET_PAGE_BITS);
-    for (i = 0; i < len; i++) {
-        p[i] &= mask;
-    }
+    for (i = 0;  i < length; i += TARGET_PAGE_SIZE) {
+        index = ((addr + i) >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+        offset = ((addr + i) >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+        mask = ~(1UL << offset);
+        ram_list.phys_dirty[dirty_flag_to_idx(dirty_flags)][index] &= mask;
+     }
 }
 
 void cpu_physical_memory_reset_dirty(ram_addr_t start, ram_addr_t end,

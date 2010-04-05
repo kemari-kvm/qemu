@@ -2851,6 +2851,7 @@ ram_addr_t qemu_ram_alloc_from_ptr(DeviceState *dev, const char *name,
                                    ram_addr_t size, void *host)
 {
     RAMBlock *new_block, *block;
+    int i;
 
     size = TARGET_PAGE_ALIGN(size);
     new_block = qemu_mallocz(sizeof(*new_block));
@@ -2905,10 +2906,15 @@ ram_addr_t qemu_ram_alloc_from_ptr(DeviceState *dev, const char *name,
 
     QLIST_INSERT_HEAD(&ram_list.blocks, new_block, next);
 
-    ram_list.phys_dirty = qemu_realloc(ram_list.phys_dirty,
-                                       last_ram_offset() >> TARGET_PAGE_BITS);
-    memset(ram_list.phys_dirty + (new_block->offset >> TARGET_PAGE_BITS),
-           0xff, size >> TARGET_PAGE_BITS);
+    for (i = MASTER_DIRTY_IDX; i < NUM_DIRTY_IDX; i++) {
+        ram_list.phys_dirty[i] 
+            = qemu_realloc(ram_list.phys_dirty[i],
+                           BITMAP_SIZE(last_ram_offset()));
+        memset((uint8_t *)ram_list.phys_dirty[i] +
+               BITMAP_SIZE(new_block->offset), 0xff,
+               BITMAP_SIZE(new_block->offset + size)
+               - BITMAP_SIZE(new_block->offset));
+    }
 
     if (kvm_enabled())
         kvm_setup_guest_memory(new_block->host, size);
