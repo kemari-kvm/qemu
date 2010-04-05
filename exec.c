@@ -2023,6 +2023,76 @@ static inline void tlb_reset_dirty_range(CPUTLBEntry *tlb_entry,
     }
 }
 
+/* It checks the first row and puts dirty addr in the array.  If the
+   first row is empty, it skips until length or the end addr.  If all
+   pages are non-dirty in between, it returns 0, and if it finds a
+   dirty row, it puts dirty addrs in the array. */
+int cpu_physical_memory_get_dirty_range(ram_addr_t start, ram_addr_t end, 
+                                        ram_addr_t *dirty_rams, int length,
+                                        int dirty_flag)
+{
+    unsigned long p = 0, page_number = 0;
+    ram_addr_t addr;
+    ram_addr_t s_idx = (start >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    ram_addr_t e_idx = (end >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    int i, j, offset, dirty_idx = dirty_flag_to_idx(dirty_flag);
+
+    assert(!(dirty_flag & MASTER_DIRTY_FLAG));
+
+    /* mask bits before the start addr */
+    offset = (start >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+    cpu_physical_memory_sync_master(s_idx);
+    p |= ram_list.phys_dirty[dirty_idx][s_idx] & ~((1UL << offset) - 1);
+
+    /* end wonld not be included, otherwirse it should be
+     * p &= (1UL << offset) + (1UL << offset) - 1;
+     */
+    if (end > start + TARGET_PAGE_SIZE * length) {
+        end = start + TARGET_PAGE_SIZE * length;
+        e_idx = (end >> TARGET_PAGE_BITS) / HOST_LONG_BITS;
+    }
+
+dirty:
+    if (s_idx == e_idx) {
+        /* mask bits after the end addr */
+        offset = (end >> TARGET_PAGE_BITS) & (HOST_LONG_BITS - 1);
+        p &= (1UL << offset) - 1;
+    }
+
+    if (p == ~0UL) {
+        /* when the row is fully dirtied */
+        addr = start;
+        for (i = 0; i < length; i++) {
+            dirty_rams[i] = addr;
+            addr += TARGET_PAGE_SIZE;
+        }
+    } else if (p) {
+        /* when the row is partially dirtied */
+        i = 0;
+        do {
+            j = ffsl(p) - 1;
+            p &= ~(1UL << j);
+            page_number = s_idx * HOST_LONG_BITS + j;
+            addr = page_number * TARGET_PAGE_SIZE;
+            dirty_rams[i] = addr;
+            i++;
+        } while (p && i < length);
+    } else {
+        /* skip empty rows */
+        while (s_idx < e_idx) {
+            s_idx++;
+            cpu_physical_memory_sync_master(s_idx);
+            if (ram_list.phys_dirty[dirty_idx][s_idx]) {
+                p = ram_list.phys_dirty[dirty_idx][s_idx];
+                goto dirty;
+            }
+        }
+        i = 0;
+    }
+
+    return i;
+}
+
 /* Note: start and end must be within the same ram block.  */
 void cpu_physical_memory_reset_dirty(ram_addr_t start, ram_addr_t end,
                                      int dirty_flags)

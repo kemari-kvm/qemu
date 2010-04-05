@@ -1043,6 +1043,10 @@ static inline void cpu_physical_memory_mask_dirty_range(ram_addr_t start,
      }
 }
 
+int cpu_physical_memory_get_dirty_range(ram_addr_t start, ram_addr_t end, 
+                                        ram_addr_t *dirty_rams, int length,
+                                        int dirty_flags);
+
 void cpu_physical_memory_reset_dirty(ram_addr_t start, ram_addr_t end,
                                      int dirty_flags);
 void cpu_tlb_update_dirty(CPUState *env);
