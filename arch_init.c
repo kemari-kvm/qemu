@@ -115,7 +115,8 @@ static int ram_save_block(QEMUFile *f)
     RAMBlock *block = last_block;
     ram_addr_t offset = last_offset;
     ram_addr_t current_addr;
-    int bytes_sent = 0;
+    int i, found, bytes_sent = 0, num_rams = HOST_LONG_BITS;
+    ram_addr_t dirty_rams[num_rams];
 
     if (!block)
         block = QLIST_FIRST(&ram_list.blocks);
@@ -123,45 +124,60 @@ static int ram_save_block(QEMUFile *f)
     current_addr = block->offset + offset;
 
     do {
-        if (cpu_physical_memory_get_dirty(current_addr, MIGRATION_DIRTY_FLAG)) {
+        if ((found = cpu_physical_memory_get_dirty_range(
+                 current_addr, block->offset + block->length, dirty_rams,
+                 num_rams, MIGRATION_DIRTY_FLAG))) {
             uint8_t *p;
             int cont = (block == last_block) ? RAM_SAVE_FLAG_CONTINUE : 0;
 
-            cpu_physical_memory_reset_dirty(current_addr,
-                                            current_addr + TARGET_PAGE_SIZE,
-                                            MIGRATION_DIRTY_FLAG);
+            for (i = 0; i < found; i++) {
+                ram_addr_t page_addr = dirty_rams[i];
+                ram_addr_t page_offset = page_addr - block->offset;
+                cpu_physical_memory_reset_dirty(page_addr,
+                                                page_addr + TARGET_PAGE_SIZE,
+                                                MIGRATION_DIRTY_FLAG);
 
-            p = block->host + offset;
+                p = block->host + page_offset;
 
-            if (is_dup_page(p, *p)) {
-                qemu_put_be64(f, offset | cont | RAM_SAVE_FLAG_COMPRESS);
-                if (!cont) {
-                    qemu_put_byte(f, strlen(block->idstr));
-                    qemu_put_buffer(f, (uint8_t *)block->idstr,
-                                    strlen(block->idstr));
+                if (is_dup_page(p, *p)) {
+                    qemu_put_be64(f, page_offset | cont | RAM_SAVE_FLAG_COMPRESS);
+                    if (!cont) {
+                        qemu_put_byte(f, strlen(block->idstr));
+                        qemu_put_buffer(f, (uint8_t *)block->idstr,
+                                        strlen(block->idstr));
+                        cont = RAM_SAVE_FLAG_CONTINUE;
+                    }
+                    qemu_put_byte(f, *p);
+                    bytes_sent++;
+                } else {
+                    qemu_put_be64(f, page_offset | cont | RAM_SAVE_FLAG_PAGE);
+                    if (!cont) {
+                        qemu_put_byte(f, strlen(block->idstr));
+                        qemu_put_buffer(f, (uint8_t *)block->idstr,
+                                        strlen(block->idstr));
+                        cont = RAM_SAVE_FLAG_CONTINUE;
+                    }
+                    qemu_put_buffer(f, p, TARGET_PAGE_SIZE);
+                    bytes_sent += TARGET_PAGE_SIZE;
                 }
-                qemu_put_byte(f, *p);
-                bytes_sent = 1;
-            } else {
-                qemu_put_be64(f, offset | cont | RAM_SAVE_FLAG_PAGE);
-                if (!cont) {
-                    qemu_put_byte(f, strlen(block->idstr));
-                    qemu_put_buffer(f, (uint8_t *)block->idstr,
-                                    strlen(block->idstr));
-                }
-                qemu_put_buffer(f, p, TARGET_PAGE_SIZE);
-                bytes_sent = TARGET_PAGE_SIZE;
             }
 
             break;
         }
 
-        offset += TARGET_PAGE_SIZE;
+        offset += (num_rams * TARGET_PAGE_SIZE);
         if (offset >= block->length) {
+            RAMBlock *prev = block;
+
             offset = 0;
             block = QLIST_NEXT(block, next);
             if (!block)
                 block = QLIST_FIRST(&ram_list.blocks);
+            if (prev == last_block &&
+                current_addr < last_block->offset + last_offset) {
+                last_block = block;
+                last_offset = 0;
+            }
         }
 
         current_addr = block->offset + offset;
@@ -179,14 +195,18 @@ static uint64_t bytes_transferred;
 static ram_addr_t ram_save_remaining(void)
 {
     RAMBlock *block;
+    int found = 0, num_rams = HOST_LONG_BITS;
     ram_addr_t count = 0;
+    ram_addr_t dirty_rams[num_rams];
 
     QLIST_FOREACH(block, &ram_list.blocks, next) {
         ram_addr_t addr;
         for (addr = block->offset; addr < block->offset + block->length;
-             addr += TARGET_PAGE_SIZE) {
-            if (cpu_physical_memory_get_dirty(addr, MIGRATION_DIRTY_FLAG)) {
-                count++;
+             addr += num_rams * TARGET_PAGE_SIZE) {
+            if ((found = cpu_physical_memory_get_dirty_range(
+                     addr, block->offset + block->length, dirty_rams,
+                     num_rams, MIGRATION_DIRTY_FLAG))) {
+                count += found;
             }
         }
     }
