@@ -1744,30 +1744,14 @@ typedef struct LoadStateEntry {
     int version_id;
 } LoadStateEntry;
 
-int qemu_loadvm_state(QEMUFile *f)
+static int qemu_loadvm_state_no_header(QEMUFile *f)
 {
     QLIST_HEAD(, LoadStateEntry) loadvm_handlers =
         QLIST_HEAD_INITIALIZER(loadvm_handlers);
     LoadStateEntry *le, *new_le;
     uint8_t section_type;
-    unsigned int v;
+
     int ret;
-
-    if (qemu_savevm_state_blocked(default_mon)) {
-        return -EINVAL;
-    }
-
-    v = qemu_get_be32(f);
-    if (v != QEMU_VM_FILE_MAGIC)
-        return -EINVAL;
-
-    v = qemu_get_be32(f);
-    if (v == QEMU_VM_FILE_VERSION_COMPAT) {
-        fprintf(stderr, "SaveVM v2 format is obsolete and don't work anymore\n");
-        return -ENOTSUP;
-    }
-    if (v != QEMU_VM_FILE_VERSION)
-        return -ENOTSUP;
 
     while ((section_type = qemu_get_byte(f)) != QEMU_VM_EOF) {
         uint32_t instance_id, version_id, section_id;
@@ -1860,6 +1844,31 @@ out:
         ret = -EIO;
 
     return ret;
+}
+
+int qemu_loadvm_state(QEMUFile *f)
+{
+    unsigned int v;
+
+    if (qemu_savevm_state_blocked(default_mon)) {
+        return -EINVAL;
+    }
+
+    v = qemu_get_be32(f);
+    if (v != QEMU_VM_FILE_MAGIC) {
+        return -EINVAL;
+    }
+
+    v = qemu_get_be32(f);
+    if (v == QEMU_VM_FILE_VERSION_COMPAT) {
+        fprintf(stderr, "SaveVM v2 format is obsolete and don't work anymore\n");
+        return -ENOTSUP;
+    }
+    if (v != QEMU_VM_FILE_VERSION) {
+        return -ENOTSUP;
+    }
+
+    return qemu_loadvm_state_no_header(f);
 }
 
 static int bdrv_snapshot_find(BlockDriverState *bs, QEMUSnapshotInfo *sn_info,
