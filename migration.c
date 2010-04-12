@@ -340,6 +340,19 @@ ssize_t migrate_fd_put_buffer(void *opaque, const void *data, size_t size)
     return ret;
 }
 
+int migrate_fd_get_buffer(void *opaque, uint8_t *data, int64_t pos, size_t size)
+{
+    FdMigrationState *s = opaque;
+    int ret;
+
+    ret = s->read(s, data, size);
+    if (ret == -1) {
+        ret = -(s->get_error(s));
+    }
+
+    return ret;
+}
+
 void migrate_fd_connect(FdMigrationState *s)
 {
     int ret;

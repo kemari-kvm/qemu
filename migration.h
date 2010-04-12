@@ -48,6 +48,7 @@ struct FdMigrationState
     int (*get_error)(struct FdMigrationState*);
     int (*close)(struct FdMigrationState*);
     int (*write)(struct FdMigrationState*, const void *, size_t);
+    int (*read)(struct FdMigrationState *, const void *, size_t);
     void *opaque;
 };
 
@@ -115,6 +116,8 @@ int migrate_fd_cleanup(FdMigrationState *s);
 void migrate_fd_put_notify(void *opaque);
 
 ssize_t migrate_fd_put_buffer(void *opaque, const void *data, size_t size);
+
+int migrate_fd_get_buffer(void *opaque, uint8_t *data, int64_t pos, size_t size);
 
 void migrate_fd_connect(FdMigrationState *s);
 

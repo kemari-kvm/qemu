@@ -38,6 +38,20 @@ static int socket_write(FdMigrationState *s, const void * buf, size_t size)
     return send(s->fd, buf, size, 0);
 }
 
+static int socket_read(FdMigrationState *s, const void * buf, size_t size)
+{
+    ssize_t len;
+
+    do {
+        len = recv(s->fd, (void *)buf, size, 0);
+    } while (len == -1 && socket_error() == EINTR);
+    if (len == -1) {
+        len = -socket_error();
+    }
+
+    return len;
+}
+
 static int tcp_close(FdMigrationState *s)
 {
     DPRINTF("tcp_close\n");
@@ -93,6 +107,7 @@ MigrationState *tcp_start_outgoing_migration(Monitor *mon,
 
     s->get_error = socket_errno;
     s->write = socket_write;
+    s->read = socket_read;
     s->close = tcp_close;
     s->mig_state.cancel = migrate_fd_cancel;
     s->mig_state.get_status = migrate_fd_get_status;
