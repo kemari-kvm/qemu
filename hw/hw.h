@@ -58,6 +58,8 @@ void qemu_fflush(QEMUFile *f);
 int qemu_fclose(QEMUFile *f);
 void qemu_put_buffer(QEMUFile *f, const uint8_t *buf, int size);
 void qemu_put_byte(QEMUFile *f, int v);
+void *qemu_realloc_buffer(QEMUFile *f, int size);
+void qemu_clear_buffer(QEMUFile *f);
 
 static inline void qemu_put_ubyte(QEMUFile *f, unsigned int v)
 {
