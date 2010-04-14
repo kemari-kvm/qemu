@@ -2115,7 +2115,7 @@ static void tcp_chr_telnet_init(int fd)
     send(fd, (char *)buf, 3, 0);
 }
 
-static void socket_set_nodelay(int fd)
+void socket_set_nodelay(int fd)
 {
     int val = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&val, sizeof(val));
