@@ -360,3 +360,18 @@ disable milkymist_uart_pulse_irq_tx(void) "Pulse IRQ TX"
 # hw/milkymist-vgafb.c
 disable milkymist_vgafb_memory_read(uint32_t addr, uint32_t value) "addr %08x value %08x"
 disable milkymist_vgafb_memory_write(uint32_t addr, uint32_t value) "addr %08x value %08x"
+
+# ft_trans_file.c
+disable ft_trans_realloc(size_t old_size, size_t new_size) "increasing buffer from %zu by %zu"
+disable ft_trans_append(size_t size) "buffering %zu bytes"
+disable ft_trans_flush(size_t size, size_t req) "flushed %zu of %zu bytes"
+disable ft_trans_send_header(uint16_t cmd) "send header %d"
+disable ft_trans_recv_header(uint16_t cmd) "recv header %d"
+disable ft_trans_put_buffer(size_t size, int64_t pos) "putting %d bytes at %"PRId64""
+disable ft_trans_recv_payload(size_t len, uint32_t hdr, size_t total) "recv %d of %d total %d"
+disable ft_trans_close(void) "closing"
+disable ft_trans_freeze_output(void) "backend not ready, freezing output"
+disable ft_trans_freeze_input(void) "backend not ready, freezing input"
+disable ft_trans_put_ready(void) "file is ready to put"
+disable ft_trans_get_ready(void) "file is ready to get"
+disable ft_trans_cb(void *cb) "callback %p"

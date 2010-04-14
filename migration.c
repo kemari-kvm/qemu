@@ -15,6 +15,7 @@
 #include "migration.h"
 #include "monitor.h"
 #include "buffered_file.h"
+#include "ft_trans_file.h"
 #include "sysemu.h"
 #include "block.h"
 #include "qemu_socket.h"
@@ -30,6 +31,8 @@
 #define DPRINTF(fmt, ...) \
     do { } while (0)
 #endif
+
+enum FT_MODE ft_mode = FT_OFF;
 
 /* Migration speed throttling */
 static int64_t max_throttle = (32 << 20);
