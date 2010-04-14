@@ -48,6 +48,12 @@ int qemu_start_incoming_migration(const char *uri)
     const char *p;
     int ret;
 
+    /* check ft_mode (Kemari protocol) */
+    if (strstart(uri, "kemari:", &p)) {
+        ft_mode = FT_INIT;
+        uri = p;
+    }
+
     if (strstart(uri, "tcp:", &p))
         ret = tcp_start_incoming_migration(p);
 #if !defined(WIN32)
@@ -97,6 +103,12 @@ int do_migrate(Monitor *mon, const QDict *qdict, QObject **ret_data)
 
     if (qemu_savevm_state_blocked(mon)) {
         return -1;
+    }
+
+    /* check ft_mode (Kemari protocol) */
+    if (strstart(uri, "kemari:", &p)) {
+        ft_mode = FT_INIT;
+        uri = p;
     }
 
     if (strstart(uri, "tcp:", &p)) {
