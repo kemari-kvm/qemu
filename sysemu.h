@@ -70,6 +70,8 @@ int qemu_savevm_state_begin(Monitor *mon, QEMUFile *f, int blk_enable,
 int qemu_savevm_state_iterate(Monitor *mon, QEMUFile *f);
 int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f);
 void qemu_savevm_state_cancel(Monitor *mon, QEMUFile *f);
+int qemu_savevm_trans_begin(Monitor *mon, QEMUFile *f, int init);
+int qemu_savevm_trans_complete(Monitor *mon, QEMUFile *f);
 int qemu_loadvm_state(QEMUFile *f);
 
 /* SLIRP */

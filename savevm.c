@@ -1630,106 +1630,65 @@ bool qemu_savevm_state_blocked(Monitor *mon)
     return false;
 }
 
-int qemu_savevm_state_begin(Monitor *mon, QEMUFile *f, int blk_enable,
-                            int shared)
+/*
+ * section: header to write
+ * inc: if true, forces to pass SECTION_PART instead of SECTION_START
+ * pause: if true, breaks the loop when live handler returned 0
+ */
+static int qemu_savevm_state_live(Monitor *mon, QEMUFile *f, int section,
+                                  bool inc, bool pause)
 {
     SaveStateEntry *se;
+    int skip = 0, ret;
 
     QTAILQ_FOREACH(se, &savevm_handlers, entry) {
-        if(se->set_params == NULL) {
-            continue;
-	}
-	se->set_params(blk_enable, shared, se->opaque);
-    }
-    
-    qemu_put_be32(f, QEMU_VM_FILE_MAGIC);
-    qemu_put_be32(f, QEMU_VM_FILE_VERSION);
+        int len, stage;
 
-    QTAILQ_FOREACH(se, &savevm_handlers, entry) {
-        int len;
-
-        if (se->save_live_state == NULL)
+        if (se->save_live_state == NULL) {
             continue;
+        }
 
         /* Section type */
-        qemu_put_byte(f, QEMU_VM_SECTION_START);
+        qemu_put_byte(f, section);
         qemu_put_be32(f, se->section_id);
 
-        /* ID string */
-        len = strlen(se->idstr);
-        qemu_put_byte(f, len);
-        qemu_put_buffer(f, (uint8_t *)se->idstr, len);
+        if (section == QEMU_VM_SECTION_START) {
+            /* ID string */
+            len = strlen(se->idstr);
+            qemu_put_byte(f, len);
+            qemu_put_buffer(f, (uint8_t *)se->idstr, len);
 
-        qemu_put_be32(f, se->instance_id);
-        qemu_put_be32(f, se->version_id);
+            qemu_put_be32(f, se->instance_id);
+            qemu_put_be32(f, se->version_id);
 
-        se->save_live_state(mon, f, QEMU_VM_SECTION_START, se->opaque);
-    }
+            stage = inc ? QEMU_VM_SECTION_PART : QEMU_VM_SECTION_START;
+        } else {
+            assert(inc);
+            stage = section;
+        }
 
-    if (qemu_file_has_error(f)) {
-        qemu_savevm_state_cancel(mon, f);
-        return -EIO;
-    }
-
-    return 0;
-}
-
-int qemu_savevm_state_iterate(Monitor *mon, QEMUFile *f)
-{
-    SaveStateEntry *se;
-    int ret = 1;
-
-    QTAILQ_FOREACH(se, &savevm_handlers, entry) {
-        if (se->save_live_state == NULL)
-            continue;
-
-        /* Section type */
-        qemu_put_byte(f, QEMU_VM_SECTION_PART);
-        qemu_put_be32(f, se->section_id);
-
-        ret = se->save_live_state(mon, f, QEMU_VM_SECTION_PART, se->opaque);
+        ret = se->save_live_state(mon, f, stage, se->opaque);
         if (!ret) {
-            /* Do not proceed to the next vmstate before this one reported
-               completion of the current stage. This serializes the migration
-               and reduces the probability that a faster changing state is
-               synchronized over and over again. */
-            break;
+            skip++;
+            if (pause) {
+                break;
+            }
         }
     }
 
-    if (ret)
-        return 1;
-
-    if (qemu_file_has_error(f)) {
-        qemu_savevm_state_cancel(mon, f);
-        return -EIO;
-    }
-
-    return 0;
+    return skip;
 }
 
-int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f)
+static void qemu_savevm_state_full(QEMUFile *f)
 {
     SaveStateEntry *se;
-
-    cpu_synchronize_all_states();
-
-    QTAILQ_FOREACH(se, &savevm_handlers, entry) {
-        if (se->save_live_state == NULL)
-            continue;
-
-        /* Section type */
-        qemu_put_byte(f, QEMU_VM_SECTION_END);
-        qemu_put_be32(f, se->section_id);
-
-        se->save_live_state(mon, f, QEMU_VM_SECTION_END, se->opaque);
-    }
 
     QTAILQ_FOREACH(se, &savevm_handlers, entry) {
         int len;
 
-	if (se->save_state == NULL && se->vmsd == NULL)
-	    continue;
+        if (se->save_state == NULL && se->vmsd == NULL) {
+            continue;
+        }
 
         /* Section type */
         qemu_put_byte(f, QEMU_VM_SECTION_FULL);
@@ -1747,9 +1706,91 @@ int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f)
     }
 
     qemu_put_byte(f, QEMU_VM_EOF);
+}
 
-    if (qemu_file_has_error(f))
+int qemu_savevm_state_begin(Monitor *mon, QEMUFile *f, int blk_enable,
+                            int shared)
+{
+    SaveStateEntry *se;
+
+    QTAILQ_FOREACH(se, &savevm_handlers, entry) {
+        if (se->set_params == NULL) {
+            continue;
+        }
+        se->set_params(blk_enable, shared, se->opaque);
+    }
+
+    qemu_put_be32(f, QEMU_VM_FILE_MAGIC);
+    qemu_put_be32(f, QEMU_VM_FILE_VERSION);
+
+    qemu_savevm_state_live(mon, f, QEMU_VM_SECTION_START, 0, 0);
+
+    if (qemu_file_has_error(f)) {
+        qemu_savevm_state_cancel(mon, f);
         return -EIO;
+    }
+
+    return 0;
+}
+
+int qemu_savevm_state_iterate(Monitor *mon, QEMUFile *f)
+{
+    int ret = 1;
+
+    /* Do not proceed to the next vmstate before this one reported
+       completion of the current stage. This serializes the migration
+       and reduces the probability that a faster changing state is
+       synchronized over and over again. */
+    ret = qemu_savevm_state_live(mon, f, QEMU_VM_SECTION_PART, 1, 1);
+    if (!ret) {
+        return 1;
+    }
+
+    if (qemu_file_has_error(f)) {
+        qemu_savevm_state_cancel(mon, f);
+        return -EIO;
+    }
+
+    return 0;
+}
+
+int qemu_savevm_state_complete(Monitor *mon, QEMUFile *f)
+{
+    cpu_synchronize_all_states();
+
+    qemu_savevm_state_live(mon, f, QEMU_VM_SECTION_END, 1, 0);
+    qemu_savevm_state_full(f);
+
+    if (qemu_file_has_error(f)) {
+        return -EIO;
+    }
+
+    return 0;
+}
+
+int qemu_savevm_trans_begin(Monitor *mon, QEMUFile *f, int init)
+{
+    int ret;
+
+    ret = qemu_savevm_state_live(mon, f, QEMU_VM_SECTION_START, !init, 0);
+
+    if (qemu_file_has_error(f)) {
+        return -EIO;
+    }
+
+    return ret;
+}
+
+int qemu_savevm_trans_complete(Monitor *mon, QEMUFile *f)
+{
+    cpu_synchronize_all_states();
+
+    qemu_savevm_state_live(mon, f, QEMU_VM_SECTION_PART, 1, 0);
+    qemu_savevm_state_full(f);
+
+    if (qemu_file_has_error(f)) {
+        return -EIO;
+    }
 
     return 0;
 }
