@@ -375,3 +375,13 @@ disable ft_trans_freeze_input(void) "backend not ready, freezing input"
 disable ft_trans_put_ready(void) "file is ready to put"
 disable ft_trans_get_ready(void) "file is ready to get"
 disable ft_trans_cb(void *cb) "callback %p"
+
+# event-tap.c
+disable event_tap_ignore_bh(int bh) "event_tap_bh is already scheduled %d"
+disable event_tap_net_cb(char *s, ssize_t len) "%s: %zd bytes packet was sended"
+disable event_tap_no_event(void) "no last_event_tap"
+disable event_tap_already_used(int mode) "last_event_tap already used %d"
+disable event_tap_append_packet(void) "This packet is appended"
+disable event_tap_replay_no_event(void) "No event to replay"
+disable event_tap_save_no_event(void) "No event to save"
+disable event_tap_load_no_event(void) "No event to load"

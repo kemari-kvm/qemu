@@ -15,6 +15,8 @@
 #include "monitor.h"
 #include "qemu-timer.h"
 #include "qemu-log.h"
+#include "sysemu.h"
+#include "event-tap.h"
 
 #include <sys/time.h>
 
@@ -70,4 +72,30 @@ int qemu_set_fd_handler2(int fd,
 
 void qemu_notify_event(void)
 {
+}
+
+BlockDriverAIOCB *event_tap_bdrv_aio_writev(BlockDriverState *bs,
+                                            int64_t sector_num,
+                                            QEMUIOVector *iov,
+                                            int nb_sectors,
+                                            BlockDriverCompletionFunc *cb,
+                                            void *opaque)
+{
+    return NULL;
+}
+
+BlockDriverAIOCB *event_tap_bdrv_aio_flush(BlockDriverState *bs,
+                                           BlockDriverCompletionFunc *cb,
+                                           void *opaque)
+{
+    return NULL;
+}
+
+void event_tap_bdrv_flush(void)
+{
+}
+
+int event_tap_is_on(void)
+{
+    return 0;
 }
