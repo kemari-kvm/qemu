@@ -160,6 +160,7 @@ int main(int argc, char **argv)
 #include "qemu-queue.h"
 #include "cpus.h"
 #include "arch_init.h"
+#include "event-tap.h"
 
 #include "ui/qemu-spice.h"
 
@@ -2973,6 +2974,8 @@ int main(int argc, char **argv, char **envp)
     bdrv_init_with_whitelist();
 
     blk_mig_init();
+
+    event_tap_init();
 
     /* open the virtual block devices */
     if (snapshot)
