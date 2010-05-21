@@ -33,6 +33,7 @@
 #include "osdep.h"
 #include "kvm.h"
 #include "qemu-timer.h"
+#include "event-tap.h"
 #if defined(CONFIG_USER_ONLY)
 #include <qemu.h>
 #include <signal.h>
@@ -3736,6 +3737,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 io_index = (pd >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
                 if (p)
                     addr1 = (addr & ~TARGET_PAGE_MASK) + p->region_offset;
+
+                event_tap_mmio(addr, buf, len);
+
                 /* XXX: could force cpu_single_env to NULL to avoid
                    potential bugs */
                 if (l >= 4 && ((addr1 & 3) == 0)) {
