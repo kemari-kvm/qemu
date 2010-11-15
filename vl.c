@@ -1096,6 +1096,7 @@ static void nographic_update(void *opaque)
 struct vm_change_state_entry {
     VMChangeStateHandler *cb;
     void *opaque;
+    int deleted;
     QLIST_ENTRY (vm_change_state_entry) entries;
 };
 
@@ -1116,18 +1117,22 @@ VMChangeStateEntry *qemu_add_vm_change_state_handler(VMChangeStateHandler *cb,
 
 void qemu_del_vm_change_state_handler(VMChangeStateEntry *e)
 {
-    QLIST_REMOVE (e, entries);
-    qemu_free (e);
+    e->deleted = 1;
 }
 
 void vm_state_notify(int running, int reason)
 {
-    VMChangeStateEntry *e;
+    VMChangeStateEntry *e, *ne;
 
     trace_vm_state_notify(running, reason);
 
-    for (e = vm_change_state_head.lh_first; e; e = e->entries.le_next) {
-        e->cb(e->opaque, running, reason);
+    QLIST_FOREACH_SAFE(e, &vm_change_state_head, entries, ne) {
+        if (e->deleted) {
+            QLIST_REMOVE(e, entries);
+            qemu_free(e);
+        } else {
+            e->cb(e->opaque, running, reason);
+        }
     }
 }
 
