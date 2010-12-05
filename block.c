@@ -28,6 +28,7 @@
 #include "block_int.h"
 #include "module.h"
 #include "qemu-objects.h"
+#include "event-tap.h"
 
 #ifdef CONFIG_BSD
 #include <sys/types.h>
@@ -1591,6 +1592,10 @@ int bdrv_flush(BlockDriverState *bs)
     }
 
     if (bs->drv && bs->drv->bdrv_flush) {
+        if (*bs->device_name && event_tap_is_on()) {
+            event_tap_bdrv_flush();
+        }
+
         return bs->drv->bdrv_flush(bs);
     }
 
@@ -2226,6 +2231,11 @@ BlockDriverAIOCB *bdrv_aio_writev(BlockDriverState *bs, int64_t sector_num,
     if (bdrv_check_request(bs, sector_num, nb_sectors))
         return NULL;
 
+    if (*bs->device_name && event_tap_is_on()) {
+        return event_tap_bdrv_aio_writev(bs, sector_num, qiov, nb_sectors,
+                                         cb, opaque);
+    }
+
     if (bs->dirty_bitmap) {
         blk_cb_data = blk_dirty_cb_alloc(bs, sector_num, nb_sectors, cb,
                                          opaque);
@@ -2499,6 +2509,11 @@ BlockDriverAIOCB *bdrv_aio_flush(BlockDriverState *bs,
 
     if (!drv)
         return NULL;
+
+    if (*bs->device_name && event_tap_is_on()) {
+        return event_tap_bdrv_aio_flush(bs, cb, opaque);
+    }
+
     return drv->bdrv_aio_flush(bs, cb, opaque);
 }
 
