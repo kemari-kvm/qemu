@@ -36,6 +36,7 @@
 #include "qemu_socket.h"
 #include "hw/qdev.h"
 #include "iov.h"
+#include "event-tap.h"
 
 static QTAILQ_HEAD(, VLANState) vlans;
 static QTAILQ_HEAD(, VLANClientState) non_vlan_clients;
@@ -518,6 +519,10 @@ ssize_t qemu_send_packet_async(VLANClientState *sender,
 
 void qemu_send_packet(VLANClientState *vc, const uint8_t *buf, int size)
 {
+    if (event_tap_is_on()) {
+        return event_tap_send_packet(vc, buf, size);
+    }
+
     qemu_send_packet_async(vc, buf, size, NULL);
 }
 
@@ -598,6 +603,10 @@ ssize_t qemu_sendv_packet_async(VLANClientState *sender,
                                 NetPacketSent *sent_cb)
 {
     NetQueue *queue;
+
+    if (event_tap_is_on()) {
+        return event_tap_sendv_packet_async(sender, iov, iovcnt, sent_cb);
+    }
 
     if (sender->link_down || (!sender->peer && !sender->vlan)) {
         return iov_size(iov, iovcnt);
