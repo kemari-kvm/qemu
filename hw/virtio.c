@@ -672,12 +672,20 @@ void virtio_save(VirtIODevice *vdev, QEMUFile *f)
     qemu_put_be32(f, i);
 
     for (i = 0; i < VIRTIO_PCI_QUEUE_MAX; i++) {
+        /* For regular migration inuse == 0 always as
+         * requests are flushed before save. However,
+         * event-tap log when enabled introduces an extra
+         * queue for requests which is not being flushed,
+         * thus the last inuse requests are left in the event-tap queue.
+         * Move the last_avail_idx value sent to the remote back
+         * to make it repeat the last inuse requests. */
+        uint16_t last_avail = vdev->vq[i].last_avail_idx - vdev->vq[i].inuse;
         if (vdev->vq[i].vring.num == 0)
             break;
 
         qemu_put_be32(f, vdev->vq[i].vring.num);
         qemu_put_be64(f, vdev->vq[i].pa);
-        qemu_put_be16s(f, &vdev->vq[i].last_avail_idx);
+        qemu_put_be16s(f, &last_avail);
         if (vdev->binding->save_queue)
             vdev->binding->save_queue(vdev->binding_opaque, i, f);
     }
