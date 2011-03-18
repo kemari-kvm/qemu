@@ -693,8 +693,9 @@ void migrate_fd_cancel(MigrationState *mig_state)
 {
     FdMigrationState *s = migrate_to_fms(mig_state);
 
-    if (s->state != MIG_STATE_ACTIVE)
+    if (s->state == MIG_STATE_CANCELLED) {
         return;
+    }
 
     DPRINTF("cancelling migration\n");
 
@@ -709,8 +710,10 @@ void migrate_fd_cancel(MigrationState *mig_state)
         event_tap_unregister();
     }
 
-    qemu_savevm_state_cancel(s->mon, s->file);
-    migrate_fd_cleanup(s);
+    if (s->file) {
+        qemu_savevm_state_cancel(s->mon, s->file);
+        migrate_fd_cleanup(s);
+    }
 }
 
 void migrate_fd_release(MigrationState *mig_state)
